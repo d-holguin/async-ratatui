@@ -1,0 +1,19 @@
+[package]
+name = "async_ratatui"
+version = "0.1.0"
+edition = "2021"
+
+
+[lib]
+name = "async_ratatui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "async_ratatui"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.87"
+rand = "0.8.5"
+ratatui = "0.28.1"
+tokio = { version = "1.40.0", features = ["full"] }
