@@ -1,8 +1,7 @@
 # Async [Ratatui](https://github.com/ratatui/ratatui) Event Loop with  [Immediate Mode Rendering](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) in Rust
 This is a personal learning exercise, demonstrating how to set up an async render loop with immediate-mode rendering in the terminal with [Ratatui](https://github.com/ratatui/ratatui) and Rust.
 
-It employs [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, asynchronously handling mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI.
-
+It takes inspiration from [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, encapsulating state and logic within the Tui struct. This approach allows asynchronous handling of mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI. However, unlike pure TEA, which typically uses immutable state and stateless functions, this implementation maintains mutable state within the Tui struct for efficiency and simplicity in Rust’s environment.
 
 ## Immediate Mode GUI
 The UI follows an [**immediate-mode GUI**](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) approach. The `frame_interval` ensures that the UI is updated at a rate defined by `frame_rate` (e.g., 30 frames per second). This guarantees smooth rendering but means that the application continuously redraws the UI, even when no changes have occurred.
@@ -14,7 +13,7 @@ While this optimization is relatively easy to implement, it adds complexity that
 ![example](example.gif)
 
 ## The Terminal User Interface(TUI)
-The Tui struct is the core structure that manages the terminal interface and controls the flow of the application. This implementation uses [Tokio](https://github.com/tokio-rs/tokio) for the runtime. Using [`tokio::sync::mpsc`](https://docs.rs/tokio/latest/tokio/sync/mpsc/) to send `Messages` to update the `Model`
+The Tui struct is the core structure that manages the terminal interface and controls the flow of the application. This implementation uses [Tokio](https://github.com/tokio-rs/tokio) for the runtime. Using [`tokio::sync::mpsc`](https://docs.rs/tokio/latest/tokio/sync/mpsc/) to send messages to update the `Model`
 ```rust
 pub struct Tui {
     pub terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -27,8 +26,7 @@ pub struct Tui {
 ```
 
 ## State Management
-The Model struct holds the application's current state. In this implementation, state management is central to how the UI is rendered and updated, as it tracks the position of entities, mouse hover locations, and performance data like FPS. The state is continually updated based on user interactions or timed events, and those changes are reflected in the terminal UI during rendering.
-
+The `Model` struct holds the application's current state. In this implementation, state management is central to how the UI is rendered and updated, as it tracks the position of entities, mouse hover locations, and performance data like FPS. The state is continually updated based on user interactions or timed events, and those changes are reflected in the terminal UI during rendering.
 ```rust
 pub struct Model {
     pub hover_pos: (u16, u16),
@@ -73,7 +71,7 @@ The update function is responsible for processing Message events and updating th
             let clicked_entity = self.model.hover_entity.clone();
             self.model.entities.push(clicked_entity); //push the current shape on cursor hover to be drawn by the UI
 
-            let new_entity: Entity = if random::<bool>(){ 
+            let new_entity: Entity = if random::<bool>(){  // assign new random shape(Balloon or Brick) as the hover shape on the cursor's hover position
                 Entity::Balloon(Balloon {
                     circle: Circle {
                         x,
@@ -96,11 +94,10 @@ The update function is responsible for processing Message events and updating th
                 })
             };
             self.model.hover_entity = new_entity;
-
             Ok(UpdateCommand::None)
         }
         Message::MouseHoverPos(row, col) => {
-
+            // of the two possible hover shapes, render them accordingly
             self.model.hover_pos = (row, col);
             match &mut self.model.hover_entity {
                 Entity::Balloon(balloon) => {
@@ -123,14 +120,11 @@ The `view` function is responsible for rendering the current state of the applic
 ```rust
     fn view(&mut self) -> Result<()> {
         let (term_width, term_height) = self.terminal.size().map(|s| (s.width, s.height))?;
-
         self.terminal.draw(|f| {
             let screen_area = f.area();
-
             let x_bounds = [0.0, term_width as f64];
             let y_bounds = [0.0, term_height as f64];
-
-
+            
             let content = Canvas::default()
                 .block(Block::bordered().title(format!("Esc to Quit. FPS: {}", self.model.fps_counter.fps)))
                 .x_bounds(x_bounds)
@@ -167,6 +161,28 @@ At the heart of the application is the asynchronous **event loop**, which is res
 3. **Input Events**: Handles user input, such as mouse clicks, key presses, or terminal resizing.
 
 [tokio::select!](https://tokio.rs/tokio/tutorial/select): This macro allows the application loop to wait on multiple asynchronous operations simultaneously. It reacts to whichever event occurs first, ensuring that ticks, rendering, and input handling are all processed efficiently and without blocking each other.
+
+```mermaid
+flowchart TD
+    Start((Start Event Loop))
+    Start --> Select[tokio::select!]
+    
+    Select -->|Tick Interval| SendTick[Send Message::Tick]
+    SendTick --> BackToSelect[Back to tokio::select!]
+    
+    Select -->|Frame Interval| SendRender[Send Message::Render]
+    SendRender --> BackToSelect
+    
+    Select -->|Incoming Message| ProcessMessage[Process Message with update()]
+    ProcessMessage -->|Update State| CheckQuit{Is Quit Command?}
+    CheckQuit -->|Yes| Exit[Exit Application]
+    CheckQuit -->|No| BackToSelect
+    
+    Select -->|Input Event| PollEvent[Poll for Input Events]
+    PollEvent -->|Event Ready| ReadEvent[Read and Handle Event]
+    ReadEvent --> BackToSelect
+    PollEvent -->|No Event| BackToSelect
+```
 
 ```rust
     pub async fn run(&mut self) -> Result<()> {
@@ -245,7 +261,7 @@ In the example, two types of shapes are drawn randomly using the rand crate:
 - Brick: Falls and crashes to the ground, simulating a heavier object pulled down by gravity.
 
 
-#### Using the trait `Drawable:`
+#### The `Drawable` trait 
 ```rust
 pub trait Drawable {
     fn tick(&mut self);
