@@ -1,7 +1,7 @@
-# Async [Ratatui](https://github.com/ratatui/ratatui) Event Loop with  [Immediate Mode Rendering](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) in Rust
-This is a personal learning exercise, demonstrating how to set up an async render loop with immediate-mode rendering in the terminal with [Ratatui](https://github.com/ratatui/ratatui) and Rust.
+# Async RatatuiEvent Loop with  Immediate Mode Rendering in Rust
+This is a personal learning exercise, demonstrating how to set up an async render loop with [immediate-mode GUI](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) rendering in the terminal with [Ratatui](https://github.com/ratatui/ratatui) and Rust.
 
-It takes inspiration from [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, encapsulating state and logic within the Tui struct. This approach allows asynchronous handling of mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI. However, unlike pure TEA, which typically uses immutable state and stateless functions, this implementation maintains mutable state within the Tui struct for efficiency and simplicity in Rust’s environment.
+It takes inspiration from [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, encapsulating state and logic within the Tui struct. This approach allows asynchronous handling of mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI. However, unlike pure TEA, which typically uses immutable state and stateless functions, this implementation [maintains mutable state within the Tui struct](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/) for efficiency and simplicity in Rust’s environment.
 
 ## Immediate Mode GUI
 The UI follows an [**immediate-mode GUI**](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) approach. The `frame_interval` ensures that the UI is updated at a rate defined by `frame_rate` (e.g., 30 frames per second). This guarantees smooth rendering but means that the application continuously redraws the UI, even when no changes have occurred.
