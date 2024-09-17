@@ -173,7 +173,7 @@ flowchart TD
     Select -->|Frame Interval| SendRender[Send Message::Render]
     SendRender --> BackToSelect
     
-    Select -->|Incoming Message| ProcessMessage[Process Message with update()]
+    Select -->|Incoming Message| ProcessMessage[Process Message with update]
     ProcessMessage -->|Update State| CheckQuit{Is Quit Command?}
     CheckQuit -->|Yes| Exit[Exit Application]
     CheckQuit -->|No| BackToSelect
