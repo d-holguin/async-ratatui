@@ -1,7 +1,15 @@
 # Async [Ratatui](https://github.com/ratatui/ratatui) Event Loop with  [Immediate Mode Rendering](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) in Rust
-This is a personal learning project demonstrating how to set up an async render loop with immediate-mode rendering in the terminal with [Ratatui](https://github.com/ratatui/ratatui) and Rust.
+This is a personal learning exercise, demonstrating how to set up an async render loop with immediate-mode rendering in the terminal with [Ratatui](https://github.com/ratatui/ratatui) and Rust.
 
-This uses [event handling](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/) similar to [**The Elm Architecture (TEA)**](https://guide.elm-lang.org/architecture/) to asynchronously handle various events, such as mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI.
+It employs [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, asynchronously handling mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI.
+
+
+## Immediate Mode GUI
+The UI follows an [**immediate-mode GUI**](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) approach. The `frame_interval` ensures that the UI is updated at a rate defined by `frame_rate` (e.g., 30 frames per second). This guarantees smooth rendering but means that the application continuously redraws the UI, even when no changes have occurred.
+
+If you want to optimize this, you could modify the application to render only when the state changes (e.g., after user input or specific events). This could be done by returning an `UpdateCommand::Render` only when a meaningful change occurs, and rendering based on that signal.
+
+While this optimization is relatively easy to implement, it adds complexity that is often unnecessary for terminal UIs. You'd need to handle edge cases, like throttling render events if too many state changes happen in a short time. For example, if frequent updates occur (like a constant stream of inputs), you might need to limit the number of renders in a given time frame to prevent starvation of other tasks. In most cases, the immediate-mode approach strikes a good balance between simplicity and responsiveness, without the need for this extra complexity.
 
 ![example](example.gif)
 
@@ -40,7 +48,7 @@ pub enum Message {
 }
 ```
 ## Updating State
-The update function is responsible for processing Message events and updating the state (Model) accordingly. For example `Message:Render` ticks the FPS counter and redraws the UI based on the current state.
+The update function is responsible for processing Message events and updating the state (`Model`) accordingly. For example `Message:Render` ticks the FPS counter and redraws the UI based on the current state.
 ```rust
     async fn update(&mut self, message: Message) -> Result<UpdateCommand> {
     match message {
@@ -60,7 +68,7 @@ The update function is responsible for processing Message events and updating th
         }
         Message::MouseLeftClick(row, col) => {
             let x = col as f64;
-            let y = self.terminal.size()?.height as f64 - row as f64; // invert to align coordinate system from terminal to canvas widget api
+            let y = self.terminal.size()?.height as f64 - row as f64; // invert to align coordinate system from terminal to canvas widget api. crossterm is top left (0,0), canvas is bottom left (0,0)
 
             let clicked_entity = self.model.hover_entity.clone();
             self.model.entities.push(clicked_entity); //push the current shape on cursor hover to be drawn by the UI
@@ -151,20 +159,14 @@ The `view` function is responsible for rendering the current state of the applic
     }
 ```
 
-## Asynchronous Event Loop and Rendering
-The heart of this terminal-based UI application is the asynchronous event loop managed by the run function in the Tui struct. This loop concurrently handles three core tasks:
-- Processing timed ticks that update the state of the entities (such as animations or physics). 
-- Handling user input events like mouse clicks, keyboard press, hover interactions. 
-- Rendering the terminal UI based on the current application state.
+## Event Loop
 
-Key Components of the run Function
-- **Tick Interval:** The tick interval controls how frequently the state of the entities (e.g., the position of balloons or bricks) is updated. This ensures periodic updates even if no user input occurs, which is useful for animations or timed updates. The rate is determined by tick_rate.
+At the heart of the application is the asynchronous **event loop**, which is responsible for handling all input, updating the application state, and rendering the UI. This loop runs asynchronously and processes three main types of events:
+1. **Ticks**: Regular updates that advance the state (e.g., animations, entity movements).
+2. **Render Events**: Triggered only when a state change occurs, prompting the UI to be redrawn.
+3. **Input Events**: Handles user input, such as mouse clicks, key presses, or terminal resizing.
 
-- **Frame Interval:** The frame interval controls how often the UI is redrawn. By separating the update and render cycles, you can have a consistent frame rate for rendering even if the state isn't changing rapidly. This helps ensure smooth visuals.
-
-- **Event Handling:** Input events (keyboard and mouse) are processed asynchronously. This includes handling clicks, movement, and quitting the application by pressing the Esc key. Input events are processed via `crossterm::event::poll` to avoid blocking the main loop. This uses [`tokio::task::spawn_blocking`](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html) that returns a future we can wait on.
-
-- Tokio's [`select!`](https://docs.rs/tokio/latest/tokio/macro.select.html) Macro: The [`tokio::select!`](https://tokio.rs/tokio/tutorial/select) macro is used to listen for ticks, frames, and input events simultaneously. This ensures that all events are processed as they occur, without blocking the application. The allows the application to handle multiple asynchronous events in parallel.
+[tokio::select!](https://tokio.rs/tokio/tutorial/select): This macro allows the application loop to wait on multiple asynchronous operations simultaneously. It reacts to whichever event occurs first, ensuring that ticks, rendering, and input handling are all processed efficiently and without blocking each other.
 
 ```rust
     pub async fn run(&mut self) -> Result<()> {
@@ -173,7 +175,7 @@ Key Components of the run Function
         let frame_rate = Duration::from_secs_f64(1.0 / self.frame_rate);
         let mut tick_interval = time::interval(tick_rate);
         let mut frame_interval = time::interval(frame_rate);
-        loop {
+        loop { 
             tokio::select! {
                 // Handle ticking for state updates (e.g., entity movement or animation)
                 _tick = tick_interval.tick() => {
@@ -187,11 +189,11 @@ Key Components of the run Function
                         return Err(anyhow::anyhow!("Failed to render frame: {:?}", e));
                     }
                 }
-                 // Handle incoming events. continue the loop the Quit message is received 
+                 // Handle incoming messages, such as user input events or system commands
                 Some(message) = self.event_rx.recv() => {
                     match self.update(message).await? {
-                        UpdateCommand::Quit => return {
-                            self.exit()?;
+                        UpdateCommand::Quit => return { // return, exiting the loop and the application. 
+                            self.exit()?;  // pedantic as Tui implements the Drop trait, which calls exit anyhow. 
                             Ok(())
                         },
                         UpdateCommand::None => continue,
