@@ -1,6 +1,5 @@
-# Async RatatuiEvent Loop with  Immediate Mode Rendering in Rust
-This is a personal learning exercise, demonstrating how to set up an async render loop with [immediate-mode GUI](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) rendering in the terminal with [Ratatui](https://github.com/ratatui/ratatui) and Rust.
-
+# Handling Multiple Events in Ratatui: Async Immediate Mode Rendering in Rust
+This project demonstrates how to handle multiple events asynchronously in [Ratatui](https://ratatui.rs/) using immediate-mode rendering in Rust. It serves as a personal learning exercise to explore event handling, state management, and rendering in a terminal user interface (TUI) environment.
 It takes inspiration from [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, encapsulating state and logic within the Tui struct. This approach allows asynchronous handling of mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI. However, unlike pure TEA, which typically uses immutable state and stateless functions, this implementation [maintains mutable state within the Tui struct](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/) for efficiency and simplicity in Rust’s environment.
 
 ## Immediate Mode GUI
