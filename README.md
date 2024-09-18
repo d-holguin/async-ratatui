@@ -1,4 +1,7 @@
 # Handling Multiple Events in Ratatui: Async Immediate Mode Rendering in Rust
+
+![example](example.gif)
+
 This project demonstrates how to handle multiple events asynchronously in [Ratatui](https://ratatui.rs/) using immediate-mode rendering in Rust. It serves as a personal learning exercise to explore event handling, state management, and rendering in a terminal user interface (TUI) environment.
 It takes inspiration from [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, encapsulating state and logic within the Tui struct. This approach allows asynchronous handling of mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI. However, unlike pure TEA, which typically uses immutable state and stateless functions, this implementation [maintains mutable state within the Tui struct](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/) for efficiency and simplicity in Rust’s environment.
 
@@ -8,8 +11,6 @@ The UI follows an [**immediate-mode GUI**](https://en.wikipedia.org/wiki/Immedia
 If you want to optimize this, you could modify the application to render only when the state changes (e.g., after user input or specific events). This could be done by returning an `UpdateCommand::Render` only when a meaningful change occurs, and rendering based on that signal.
 
 While this optimization is relatively easy to implement, it adds complexity that is often unnecessary for terminal UIs. You'd need to handle edge cases, like throttling render events if too many state changes happen in a short time. For example, if frequent updates occur (like a constant stream of inputs), you might need to limit the number of renders in a given time frame to prevent starvation of other tasks. In most cases, the immediate-mode approach strikes a good balance between simplicity and responsiveness, without the need for this extra complexity.
-
-![example](example.gif)
 
 ## The Terminal User Interface(TUI)
 The Tui struct is the core structure that manages the terminal interface and controls the flow of the application. This implementation uses [Tokio](https://github.com/tokio-rs/tokio) for the runtime. Using [`tokio::sync::mpsc`](https://docs.rs/tokio/latest/tokio/sync/mpsc/) to send messages to update the `Model`
