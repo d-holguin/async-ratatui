@@ -1,5 +1,4 @@
-use anyhow::{Context, Result};
-use async_ratatui::Tui;
+use async_ratatui_core::{Tui, Result};
 
 
 #[tokio::main]
@@ -12,7 +11,7 @@ async fn main() -> Result<()> {
 }
 
 pub async fn run_app() -> Result<()> {
-    let mut app = Tui::new(30.0, 10.0).context("Failed to initialize the terminal user interface (TUI)")?;
+    let mut app = Tui::new(30.0, 10.0)?;
     app.run().await?;
     Ok(())
 }

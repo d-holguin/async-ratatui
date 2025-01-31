@@ -1,7 +1,9 @@
-use anyhow::{Context, Result};
-use rand::prelude::*;
+use rand::random;
 use ratatui::backend::CrosstermBackend;
-use ratatui::crossterm::event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
+use ratatui::crossterm::event::{
+    DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseButton,
+    MouseEventKind,
+};
 use ratatui::crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::style::Color::{Black, Blue, Red};
 use ratatui::symbols::Marker;
@@ -12,18 +14,21 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time;
-mod fps_counter;
 mod entity;
+mod fps_counter;
 
 use crate::entity::{Balloon, Brick, Drawable, Entity};
 use fps_counter::FpsCounter;
 
 
+pub type Error = Box<dyn std::error::Error>;
+pub type Result<T> = std::result::Result<T, Error>;
+
 pub struct Model {
     pub hover_pos: (u16, u16),
     pub entities: Vec<Entity>,
     pub hover_entity: Entity,
-    pub fps_counter: FpsCounter
+    pub fps_counter: FpsCounter,
 }
 #[derive(Clone, Debug)]
 pub enum Message {
@@ -64,17 +69,15 @@ impl Tui {
                 entities: Vec::new(),
                 fps_counter: FpsCounter::new(),
                 hover_entity: {
-                    Entity::Balloon(
-                        Balloon {
-                            circle: Circle {
-                                x: 0.0,
-                                color: Blue,
-                                radius: 1.0,
-                                y: 0.0,
-                            },
-                            velocity_y: 0.0,
-                        }
-                    )
+                    Entity::Balloon(Balloon {
+                        circle: Circle {
+                            x: 0.0,
+                            color: Blue,
+                            radius: 1.0,
+                            y: 0.0,
+                        },
+                        velocity_y: 0.0,
+                    })
                 },
             },
         })
@@ -105,12 +108,12 @@ impl Tui {
             tokio::select! {
                 _tick = tick_interval.tick() => {
                     if let Err(e) = self.event_tx.send(Message::Tick) {
-                        return Err(anyhow::anyhow!("Failed to tick: {:?}", e));
+                        return Err(format!("Failed to tick: {:?}", e).into());
                     }
                 }
                 _frame = frame_interval.tick() => {
                     if let Err(e) = self.event_tx.send(Message::Render) {
-                        return Err(anyhow::anyhow!("Failed to render frame: {:?}", e));
+                        return Err(format!("Failed to render frame: {:?}", e).into());
                     }
                 }
                 Some(message) = self.event_rx.recv() => {
@@ -127,12 +130,12 @@ impl Tui {
                         Ok(true) => {
                             let event = crossterm::event::read()?;
                             if let Err(e) = self.handle_event(event) {
-                                return Err(anyhow::anyhow!("Failed to handle event: {:?}", e));
+                                return Err(format!("Failed to handle event: {:?}", e).into());
                             }
                         }
                         Ok(false) => continue,
                         Err(e) => {
-                                return Err(anyhow::anyhow!("Failed to poll for events: {:?}", e));
+                                return Err(format!("Failed to poll for events: {:?}", e).into());
                             }
                     }
                 }
@@ -143,23 +146,23 @@ impl Tui {
     fn handle_event(&self, event: Event) -> Result<()> {
         match event {
             Event::Key(key) => {
-                if key.kind == KeyEventKind::Press  && key.code == KeyCode::Esc{
+                if key.kind == KeyEventKind::Press && key.code == KeyCode::Esc {
                     self.event_tx.send(Message::Quit)?;
                 }
             }
-            Event::Mouse(mouse) => {
-                match mouse.kind {
-                    MouseEventKind::Down(mb) => {
-                        if mb == MouseButton::Left {
-                            self.event_tx.send(Message::MouseLeftClick(mouse.row, mouse.column))?;
-                        }
+            Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::Down(mb) => {
+                    if mb == MouseButton::Left {
+                        self.event_tx
+                            .send(Message::MouseLeftClick(mouse.row, mouse.column))?;
                     }
-                    MouseEventKind::Moved => {
-                        self.event_tx.send(Message::MouseHoverPos(mouse.row, mouse.column))?;
-                    }
-                    _ => {}
                 }
-            }
+                MouseEventKind::Moved => {
+                    self.event_tx
+                        .send(Message::MouseHoverPos(mouse.row, mouse.column))?;
+                }
+                _ => {}
+            },
             _ => {}
         }
         Ok(())
@@ -167,9 +170,7 @@ impl Tui {
 
     async fn update(&mut self, message: Message) -> Result<UpdateCommand> {
         match message {
-            Message::Quit => {
-                Ok(UpdateCommand::Quit)
-            }
+            Message::Quit => Ok(UpdateCommand::Quit),
             Message::Tick => {
                 for obj in &mut self.model.entities {
                     obj.tick();
@@ -178,7 +179,7 @@ impl Tui {
             }
             Message::Render => {
                 self.model.fps_counter.tick();
-                self.view().context("Failed to render")?;
+                self.view().map_err(|e| format!("Failed to render: {}", e))?;
                 Ok(UpdateCommand::None)
             }
             Message::MouseLeftClick(row, col) => {
@@ -188,7 +189,7 @@ impl Tui {
                 let clicked_entity = self.model.hover_entity.clone();
                 self.model.entities.push(clicked_entity);
 
-                let new_entity: Entity = if random::<bool>(){
+                let new_entity: Entity = if random::<bool>() {
                     Entity::Balloon(Balloon {
                         circle: Circle {
                             x,
@@ -215,12 +216,12 @@ impl Tui {
                 Ok(UpdateCommand::None)
             }
             Message::MouseHoverPos(row, col) => {
-
                 self.model.hover_pos = (row, col);
                 match &mut self.model.hover_entity {
                     Entity::Balloon(balloon) => {
                         balloon.circle.x = col as f64;
-                        balloon.circle.y = self.terminal.size()?.height as f64 - row as f64; //invert to match canvas coord system
+                        balloon.circle.y = self.terminal.size()?.height as f64 - row as f64;
+                        //invert to match canvas coord system
                     }
                     Entity::Brick(brick) => {
                         brick.rectangle.x = col as f64;
@@ -240,9 +241,11 @@ impl Tui {
             let x_bounds = [0.0, term_width as f64];
             let y_bounds = [0.0, term_height as f64];
 
-
             let content = Canvas::default()
-                .block(Block::bordered().title(format!("Esc to Quit. FPS: {}", self.model.fps_counter.fps)))
+                .block(
+                    Block::bordered()
+                        .title(format!("Esc to Quit. FPS: {}", self.model.fps_counter.fps)),
+                )
                 .x_bounds(x_bounds)
                 .y_bounds(y_bounds)
                 .paint(|ctx| {
@@ -269,7 +272,6 @@ impl Tui {
         Ok(())
     }
 }
-
 
 impl Drop for Tui {
     fn drop(&mut self) {

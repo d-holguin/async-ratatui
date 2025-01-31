@@ -16,6 +16,7 @@ pub enum Entity {
     Balloon(Balloon),
     Brick(Brick),
 }
+// draw
 
 
 pub trait Drawable {
@@ -78,3 +79,4 @@ impl Drawable for Brick {
         ctx.draw(&self.rectangle);
     }
 }
+// write some test
