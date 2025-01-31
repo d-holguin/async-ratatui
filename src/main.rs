@@ -1,5 +1,4 @@
-use async_ratatui_core::{Tui, Result};
-
+use async_ratatui_core::{Result, Tui};
 
 #[tokio::main]
 async fn main() -> Result<()> {

@@ -18,12 +18,10 @@ pub enum Entity {
 }
 // draw
 
-
 pub trait Drawable {
     fn tick(&mut self);
     fn draw(&self, ctx: &mut canvas::Context);
 }
-
 
 impl Drawable for Balloon {
     fn tick(&mut self) {
@@ -59,7 +57,6 @@ impl Drawable for Entity {
         }
     }
 }
-
 
 impl Drawable for Brick {
     fn tick(&mut self) {

@@ -20,7 +20,6 @@ mod fps_counter;
 use crate::entity::{Balloon, Brick, Drawable, Entity};
 use fps_counter::FpsCounter;
 
-
 pub type Error = Box<dyn std::error::Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -179,7 +178,8 @@ impl Tui {
             }
             Message::Render => {
                 self.model.fps_counter.tick();
-                self.view().map_err(|e| format!("Failed to render: {}", e))?;
+                self.view()
+                    .map_err(|e| format!("Failed to render: {}", e))?;
                 Ok(UpdateCommand::None)
             }
             Message::MouseLeftClick(row, col) => {
