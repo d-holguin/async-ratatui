@@ -2,7 +2,7 @@
 
 ![example](example.gif)
 
-This project demonstrates how to handle multiple events asynchronously in [Ratatui](https://ratatui.rs/) using immediate-mode rendering in Rust. It serves as a personal learning exercise to explore event handling, state management, and rendering in a terminal user interface (TUI) environment.
+This project demonstrates how to handle multiple events asynchronously in [Ratatui](https://ratatui.rs/) using immediate-mode rendering in Rust. It served as a personal learning exercise for myself to explore event handling, state management, and rendering in a terminal user interface (TUI) environment. If anyone else finds this useful here is how it is done.
 It takes inspiration from [The Elm Architecture (TEA)](https://guide.elm-lang.org/architecture/) for event handling, encapsulating state and logic within the Tui struct. This approach allows asynchronous handling of mouse clicks, keyboard input, and rendering frames in an immediate-mode GUI. However, unlike pure TEA, which typically uses immutable state and stateless functions, this implementation [maintains mutable state within the Tui struct](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/) for efficiency and simplicity in Rust’s environment.
 
 ## Immediate Mode GUI
@@ -61,7 +61,8 @@ The update function is responsible for processing Message events and updating th
         }
         Message::Render => {
             self.model.fps_counter.tick();
-            self.view().context("Failed to render")?;
+            self.view()
+                .map_err(|e| format!("Failed to render: {}", e))?;
             Ok(UpdateCommand::None)
         }
         Message::MouseLeftClick(row, col) => {
@@ -185,54 +186,50 @@ flowchart TD
 ```
 
 ```rust
-    pub async fn run(&mut self) -> Result<()> {
-        self.enter()?;
-        let tick_rate = Duration::from_secs_f64(1.0 / self.tick_rate);
-        let frame_rate = Duration::from_secs_f64(1.0 / self.frame_rate);
-        let mut tick_interval = time::interval(tick_rate);
-        let mut frame_interval = time::interval(frame_rate);
-        loop { 
-            tokio::select! {
-                // Handle ticking for state updates (e.g., entity movement or animation)
+       pub async fn run(&mut self) -> Result<()> {
+    self.enter()?;
+    let tick_rate = Duration::from_secs_f64(1.0 / self.tick_rate);
+    let frame_rate = Duration::from_secs_f64(1.0 / self.frame_rate);
+    let mut tick_interval = time::interval(tick_rate);
+    let mut frame_interval = time::interval(frame_rate);
+    loop {
+        tokio::select! {
                 _tick = tick_interval.tick() => {
                     if let Err(e) = self.event_tx.send(Message::Tick) {
-                        return Err(anyhow::anyhow!("Failed to tick: {:?}", e));
+                        return Err(format!("Failed to tick: {:?}", e).into());
                     }
                 }
-                // Handle frame rendering
                 _frame = frame_interval.tick() => {
                     if let Err(e) = self.event_tx.send(Message::Render) {
-                        return Err(anyhow::anyhow!("Failed to render frame: {:?}", e));
+                        return Err(format!("Failed to render frame: {:?}", e).into());
                     }
                 }
-                 // Handle incoming messages, such as user input events or system commands
                 Some(message) = self.event_rx.recv() => {
                     match self.update(message).await? {
-                        UpdateCommand::Quit => return { // return, exiting the loop and the application. 
-                            self.exit()?;  // pedantic as Tui implements the Drop trait, which calls exit anyhow. 
+                        UpdateCommand::Quit => return {
+                            self.exit()?;
                             Ok(())
                         },
                         UpdateCommand::None => continue,
                     }
                 }
-                // Polling for user input events asynchronously
                 Ok(ready) = tokio::task::spawn_blocking(|| crossterm::event::poll(Duration::from_millis(100))) => {
                     match ready {
                         Ok(true) => {
                             let event = crossterm::event::read()?;
                             if let Err(e) = self.handle_event(event) {
-                                return Err(anyhow::anyhow!("Failed to handle event: {:?}", e));
+                                return Err(format!("Failed to handle event: {:?}", e).into());
                             }
                         }
                         Ok(false) => continue,
                         Err(e) => {
-                                return Err(anyhow::anyhow!("Failed to poll for events: {:?}", e));
+                                return Err(format!("Failed to poll for events: {:?}", e).into());
                             }
                     }
                 }
             }
-        }
     }
+}
 ```
 
 ## That's it
@@ -248,7 +245,8 @@ async fn main() -> Result<()> {
 }
 
 pub async fn run_app() -> Result<()> {
-    let mut app = Tui::new(30.0, 10.0).context("Failed to initialize the terminal user interface (TUI)")?;
+    let mut app = Tui::new(30.0, 10.0)
+        .map_err(|e| format!("Failed to initialize the terminal user interface. {}", e))?;
     app.run().await?;
     Ok(())
 }
